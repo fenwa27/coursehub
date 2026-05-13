@@ -6,7 +6,7 @@ import crypto from 'crypto'
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY!
 const PLATFORM_FEE = 0.15
 
-function createSupabase() {
+async function createSupabase() {
   const cookieStore = await cookies()
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -29,7 +29,7 @@ export async function PUT(req: NextRequest) {
   const hash = crypto.createHmac('sha512', PAYSTACK_SECRET).update(body).digest('hex')
   if (hash !== signature) return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
   const event = JSON.parse(body)
-  const supabase = createSupabase()
+  const supabase = await createSupabase()
   if (event.event === 'charge.success') {
     await supabase.from('purchases').update({ status: 'success', paystack_transaction_id: String(event.data.id) }).eq('paystack_reference', event.data.reference)
   }
@@ -63,7 +63,7 @@ async function initializePayment(body: any) {
   })
   const data = await res.json()
   if (!data.status) return NextResponse.json({ error: data.message }, { status: 400 })
-  const supabase = createSupabase()
+  const supabase = await createSupabase()
   await supabase.from('purchases').insert({
     buyer_id, material_id, amount_paid: amount_naira,
     platform_fee: amount_naira * PLATFORM_FEE,
@@ -80,7 +80,7 @@ async function verifyPayment(body: any) {
   })
   const data = await res.json()
   if (!data.status || data.data.status !== 'success') return NextResponse.json({ success: false })
-  const supabase = createSupabase()
+  const supabase = await createSupabase()
   await supabase.from('purchases').update({ status: 'success', paystack_transaction_id: String(data.data.id) }).eq('paystack_reference', reference)
   return NextResponse.json({ success: true })
 }
@@ -98,11 +98,11 @@ async function initiateWithdrawal(body: any) {
   const transferRes = await fetch('https://api.paystack.co/transfer', {
     method: 'POST',
     headers: { Authorization: `Bearer ${PAYSTACK_SECRET}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ source: 'balance', amount: amount * 100, recipient: recipientData.data.recipient_code, reason: `CourseHub payout` }),
+    body: JSON.stringify({ source: 'balance', amount: amount * 100, recipient: recipientData.data.recipient_code, reason: 'CourseHub payout' }),
   })
   const transferData = await transferRes.json()
   if (!transferData.status) return NextResponse.json({ error: transferData.message }, { status: 400 })
-  const supabase = createSupabase()
+  const supabase = await createSupabase()
   const { data, error } = await supabase.from('withdrawals').insert({
     seller_id, amount, bank_code, bank_account_number: account_number, bank_account_name: account_name,
     paystack_transfer_code: transferData.data.transfer_code, status: 'processing',
