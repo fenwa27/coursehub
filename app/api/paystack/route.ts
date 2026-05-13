@@ -7,7 +7,7 @@ const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY!
 const PLATFORM_FEE = 0.15
 
 function createSupabase() {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
